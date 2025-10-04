@@ -3,22 +3,41 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-<title>Vertical Dodge (with Passcode)</title>
+<title>Vertical Dodge (3 Characters)</title>
 <style>
   :root { color-scheme: light dark; }
   html,body { margin:0; height:100%; font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue"; }
   #wrap { position:fixed; inset:0; background:#111; display:flex; align-items:center; justify-content:center; }
   canvas { width:100vw; height:100vh; touch-action:none; }
+
   .hud { position:fixed; left:12px; top:10px; color:#fff; font-weight:700; text-shadow:0 1px 3px #000; }
   .btns { position:fixed; right:12px; top:10px; display:flex; gap:8px; }
-  button { border:none; border-radius:12px; padding:8px 12px; font-weight:600; }
+  button { border:none; border-radius:12px; padding:8px 12px; font-weight:600; cursor:pointer; }
+
   .overlay {
     position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
-    color:#fff; background:rgba(0,0,0,.5); text-align:center; gap:14px; padding:20px;
+    color:#fff; background:rgba(0,0,0,.55); text-align:center; gap:14px; padding:20px;
   }
-  .card { background:rgba(255,255,255,.1); padding:18px 20px; border-radius:20px; backdrop-filter: blur(4px); }
+  .card { background:rgba(255,255,255,.1); padding:18px 20px; border-radius:20px; backdrop-filter: blur(4px); max-width:520px; width:calc(100% - 40px);}
+  .subtitle { opacity:.9; margin:0 0 10px; }
   input[type=password]{ padding:10px 12px; border-radius:10px; border:none; min-width:220px; }
   .hint{ opacity:.85; font-size:.9em; }
+
+  /* キャラ選択 */
+  .ch-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:8px; }
+  .ch-item{
+    background:rgba(255,255,255,.08); border:2px solid transparent; border-radius:16px; padding:10px;
+    display:flex; flex-direction:column; align-items:center; gap:8px;
+    transition:transform .08s ease, border-color .08s ease, background .08s ease;
+  }
+  .ch-item img{ width:84px; height:84px; image-rendering:pixelated; }
+  .ch-item span{ font-weight:700; }
+  .ch-item:hover{ transform:translateY(-2px); }
+  .ch-item.selected{ border-color:#22d3ee; background:rgba(34,211,238,.15); }
+
+  .row{ display:flex; gap:8px; justify-content:center; flex-wrap:wrap; }
+  .start-btn{ padding:10px 16px; border-radius:12px; font-weight:800; }
+  .start-btn[disabled]{ opacity:.5; cursor:not-allowed; }
 </style>
 </head>
 <body>
@@ -31,25 +50,44 @@
     <button id="restartBtn">↻</button>
   </div>
 
-  <!-- パスコード入力 -->
+  <!-- パスコード -->
   <div id="gate" class="overlay">
     <div class="card">
       <h2 style="margin:0 0 8px">Passcode</h2>
-      <p class="hint" style="margin:0 0 10px">合言葉を入力してください</p>
+      <p class="hint subtitle">合言葉を入力してください</p>
       <input id="pw" type="password" placeholder="passcode" />
-      <div style="display:flex;gap:8px;justify-content:center;margin-top:10px">
+      <div class="row" style="margin-top:10px">
         <button id="enterBtn">入室</button>
       </div>
       <p id="msg" class="hint" style="color:#ffd1d1;min-height:1.4em"></p>
     </div>
   </div>
 
-  <!-- ゲーム開始画面 -->
+  <!-- スタート＆キャラ選択 -->
   <div id="overlay" class="overlay" style="display:none">
     <div class="card">
       <h1 style="margin:0 0 6px">Vertical Dodge</h1>
-      <p style="margin:0 0 10px">指で左右にドラッグ／スワイプして障害物を避けてください</p>
-      <button id="startBtn">▶ ゲーム開始</button>
+      <p class="subtitle">キャラクターを選んでからゲーム開始してください</p>
+
+      <div id="chGrid" class="ch-grid">
+        <button class="ch-item" data-ch="i" aria-label="井代">
+          <img src="assets/i.png" alt="井代" onerror="this.style.opacity=0.4">
+          <span>井代</span>
+        </button>
+        <button class="ch-item" data-ch="f" aria-label="福山">
+          <img src="assets/f.png" alt="福山" onerror="this.style.opacity=0.4">
+          <span>福山</span>
+        </button>
+        <button class="ch-item" data-ch="n" aria-label="野口">
+          <img src="assets/n.png" alt="野口" onerror="this.style.opacity=0.4">
+          <span>野口</span>
+        </button>
+      </div>
+
+      <div class="row" style="margin-top:14px">
+        <button id="startBtn" class="start-btn" disabled>▶ ゲーム開始</button>
+      </div>
+      <p class="hint" style="margin-top:6px">※ キャラは端末ごとに記憶されます（セッション中）</p>
     </div>
   </div>
 </div>
@@ -57,14 +95,13 @@
 <script>
 (() => {
   // ========= パスコード =========
-  const PASSCODE = 'AK'; // ← ここが合言葉
+  const PASSCODE = 'AK';
   const gate = document.getElementById('gate');
   const enterBtn = document.getElementById('enterBtn');
   const pw = document.getElementById('pw');
   const msg = document.getElementById('msg');
   const startOverlay = document.getElementById('overlay');
 
-  // 同端末では一度通ったら当面スキップ
   if (sessionStorage.getItem('pass_ok') === '1') {
     gate.style.display = 'none';
     startOverlay.style.display = 'flex';
@@ -82,12 +119,52 @@
   };
   pw.addEventListener('keydown', e => { if(e.key==='Enter') enterBtn.click(); });
 
+  // ========= 画像読み込み & キャラ選択 =========
+  const imgMap = {
+    i: new Image(), // 井代
+    f: new Image(), // 福山
+    n: new Image(), // 野口
+  };
+  imgMap.i.src = 'assets/i.png';
+  imgMap.f.src = 'assets/f.png';
+  imgMap.n.src = 'assets/n.png';
+
+  let selectedCh = sessionStorage.getItem('ch') || null;
+  let currentImg = null;
+
+  const chGrid = document.getElementById('chGrid');
+  const startBtn = document.getElementById('startBtn');
+
+  function updateSelectionUI() {
+    [...chGrid.querySelectorAll('.ch-item')].forEach(btn=>{
+      btn.classList.toggle('selected', btn.dataset.ch === selectedCh);
+    });
+    startBtn.disabled = !selectedCh;
+  }
+
+  chGrid.addEventListener('click', (e)=>{
+    const btn = e.target.closest('.ch-item');
+    if (!btn) return;
+    selectedCh = btn.dataset.ch;
+    sessionStorage.setItem('ch', selectedCh);
+    currentImg = imgMap[selectedCh] || imgMap.i;
+    updateSelectionUI();
+  });
+
+  // URLクエリでも選択可（?ch=i/f/n）
+  const qp = new URLSearchParams(location.search);
+  if (!selectedCh && qp.get('ch')) {
+    const q = qp.get('ch').toLowerCase();
+    if (imgMap[q]) { selectedCh = q; sessionStorage.setItem('ch', q); }
+  }
+  currentImg = imgMap[selectedCh] || imgMap.i;
+  updateSelectionUI();
+
   // ========= ゲーム本体 =========
   const cv = document.getElementById('cv');
   const ct = cv.getContext('2d');
   const scEl = document.getElementById('sc');
   const bestEl = document.getElementById('best');
-  const startBtn = document.getElementById('startBtn');
   const pauseBtn = document.getElementById('pauseBtn');
   const restartBtn = document.getElementById('restartBtn');
 
@@ -109,7 +186,7 @@
   let pointerX = null;
 
   function reset() {
-    player = { x: W/2, y: H-90, r: 14, vx: 0 };
+    player = { x: W/2, y: H-90, r: 18, vx: 0 }; // 少し大きめに
     obstacles = [];
     score = 0; scEl.textContent = 0;
     tLast = performance.now();
@@ -173,9 +250,10 @@
   }
 
   function draw(){
+    // 背景
     ct.fillStyle = '#0c0f13';
     ct.fillRect(0,0,W,H);
-
+    // 流れ線
     ct.strokeStyle = 'rgba(255,255,255,.06)';
     for(let y=0;y<H;y+=40){
       ct.beginPath();
@@ -183,13 +261,22 @@
       ct.lineTo(W, (y + (performance.now()/20)%40));
       ct.stroke();
     }
-
+    // 障害物
     ct.fillStyle = '#22d3ee';
     obstacles.forEach(o => ct.fillRect(o.x, o.y, o.w, o.h));
 
-    const g = ct.createRadialGradient(player.x, player.y, 2, player.x, player.y, player.r+2);
-    g.addColorStop(0, '#fff'); g.addColorStop(1, '#60a5fa');
-    ct.fillStyle = g; ct.beginPath(); ct.arc(player.x, player.y, player.r, 0, Math.PI*2); ct.fill();
+    // プレイヤー（画像）
+    const size = player.r * 2;
+    const x = player.x - size/2;
+    const y = player.y - size/2;
+    const img = currentImg && currentImg.complete ? currentImg : null;
+    if (img) {
+      ct.drawImage(img, x, y, size, size);
+    } else {
+      // フォールバック
+      ct.fillStyle = '#60a5fa';
+      ct.beginPath(); ct.arc(player.x, player.y, player.r, 0, Math.PI*2); ct.fill();
+    }
   }
 
   function gameOver(){
@@ -197,15 +284,33 @@
     const s = Math.floor(score);
     if (s > best){ best = s; localStorage.setItem('vd_best', best); bestEl.textContent = best; }
     startOverlay.style.display = 'flex';
+    // スコア表示と再挑戦
     startOverlay.querySelector('.card').innerHTML = `
       <h2 style="margin:0 0 6px">GAME OVER</h2>
       <p style="margin:0 0 8px">Score: <b>${s}</b> ／ Best: <b>${best}</b></p>
-      <button id="againBtn">↻ もう一度</button>
+      <div class="row" style="margin-bottom:8px">
+        <button id="againBtn">↻ もう一度</button>
+      </div>
+      <p class="hint">※ キャラを変える場合は、下のボタンから選び直してください</p>
+      <div id="chGrid2" class="ch-grid" style="margin-top:8px">
+        <button class="ch-item" data-ch="i"><img src="assets/i.png" alt="井代"><span>井代</span></button>
+        <button class="ch-item" data-ch="f"><img src="assets/f.png" alt="福山"><span>福山</span></button>
+        <button class="ch-item" data-ch="n"><img src="assets/n.png" alt="野口"><span>野口</span></button>
+      </div>
     `;
     document.getElementById('againBtn').onclick = () => { startOverlay.style.display='none'; start(); };
+    // ゲームオーバー画面でも選択できるように
+    startOverlay.querySelector('#chGrid2').addEventListener('click', (e)=>{
+      const btn = e.target.closest('.ch-item'); if(!btn) return;
+      selectedCh = btn.dataset.ch;
+      sessionStorage.setItem('ch', selectedCh);
+      currentImg = imgMap[selectedCh] || imgMap.i;
+    });
   }
 
   function start(){
+    if (!selectedCh) return; // 念のため
+    currentImg = imgMap[selectedCh] || imgMap.i;
     reset();
     startOverlay.style.display = 'none';
     running = true; paused = false; pauseBtn.textContent = '⏸︎';
