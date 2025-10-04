@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-<title>Vertical Dodge</title>
+<title>Vertical Dodge (with Passcode)</title>
 <style>
   :root { color-scheme: light dark; }
   html,body { margin:0; height:100%; font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue"; }
@@ -17,16 +17,210 @@
     color:#fff; background:rgba(0,0,0,.5); text-align:center; gap:14px; padding:20px;
   }
   .card { background:rgba(255,255,255,.1); padding:18px 20px; border-radius:20px; backdrop-filter: blur(4px); }
+  input[type=password]{ padding:10px 12px; border-radius:10px; border:none; min-width:220px; }
+  .hint{ opacity:.85; font-size:.9em; }
 </style>
 </head>
 <body>
 <div id="wrap">
   <canvas id="cv" width="360" height="640"></canvas>
+
   <div class="hud">Score: <span id="sc">0</span> ｜ Best: <span id="best">0</span></div>
   <div class="btns">
     <button id="pauseBtn">⏸︎</button>
     <button id="restartBtn">↻</button>
   </div>
-  <div id="overlay" class="overlay">
+
+  <!-- パスコード入力 -->
+  <div id="gate" class="overlay">
     <div class="card">
-      <h1
+      <h2 style="margin:0 0 8px">Passcode</h2>
+      <p class="hint" style="margin:0 0 10px">合言葉を入力してください</p>
+      <input id="pw" type="password" placeholder="passcode" />
+      <div style="display:flex;gap:8px;justify-content:center;margin-top:10px">
+        <button id="enterBtn">入室</button>
+      </div>
+      <p id="msg" class="hint" style="color:#ffd1d1;min-height:1.4em"></p>
+    </div>
+  </div>
+
+  <!-- ゲーム開始画面 -->
+  <div id="overlay" class="overlay" style="display:none">
+    <div class="card">
+      <h1 style="margin:0 0 6px">Vertical Dodge</h1>
+      <p style="margin:0 0 10px">指で左右にドラッグ／スワイプして障害物を避けてください</p>
+      <button id="startBtn">▶ ゲーム開始</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  // ========= パスコード =========
+  const PASSCODE = 'AK'; // ← ここが合言葉
+  const gate = document.getElementById('gate');
+  const enterBtn = document.getElementById('enterBtn');
+  const pw = document.getElementById('pw');
+  const msg = document.getElementById('msg');
+  const startOverlay = document.getElementById('overlay');
+
+  // 同端末では一度通ったら当面スキップ
+  if (sessionStorage.getItem('pass_ok') === '1') {
+    gate.style.display = 'none';
+    startOverlay.style.display = 'flex';
+  }
+
+  enterBtn.onclick = () => {
+    if (pw.value.trim() === PASSCODE) {
+      sessionStorage.setItem('pass_ok','1');
+      gate.style.display = 'none';
+      startOverlay.style.display = 'flex';
+    } else {
+      msg.textContent = '合言葉が違います';
+      pw.focus();
+    }
+  };
+  pw.addEventListener('keydown', e => { if(e.key==='Enter') enterBtn.click(); });
+
+  // ========= ゲーム本体 =========
+  const cv = document.getElementById('cv');
+  const ct = cv.getContext('2d');
+  const scEl = document.getElementById('sc');
+  const bestEl = document.getElementById('best');
+  const startBtn = document.getElementById('startBtn');
+  const pauseBtn = document.getElementById('pauseBtn');
+  const restartBtn = document.getElementById('restartBtn');
+
+  function fit() {
+    const ratio = 360/640;
+    const w = window.innerWidth, h = window.innerHeight;
+    let cw = w, ch = Math.round(w/ratio);
+    if (ch > h) { ch = h; cw = Math.round(h*ratio); }
+    cv.style.width = cw + 'px';
+    cv.style.height = ch + 'px';
+  }
+  window.addEventListener('resize', fit); fit();
+
+  const W = 360, H = 640;
+  let player, obstacles, score, best = +localStorage.getItem('vd_best') || 0;
+  bestEl.textContent = best;
+  let tLast = 0, running = false, paused = false, speedBase = 120;
+  let spawnTimer = 0;
+  let pointerX = null;
+
+  function reset() {
+    player = { x: W/2, y: H-90, r: 14, vx: 0 };
+    obstacles = [];
+    score = 0; scEl.textContent = 0;
+    tLast = performance.now();
+    spawnTimer = 0;
+    speedBase = 120;
+  }
+
+  function spawn() {
+    const w = 40 + Math.random()*80;
+    const gap = 80 + Math.random()*80;
+    const leftBlock = {x:0, y:-20, w:Math.random()<0.5? (W-gap-w):w, h:12, vy: speedBase};
+    const rightBlock = {x:leftBlock.w+gap, y:-20, w: W-(leftBlock.w+gap), h:12, vy: speedBase};
+    obstacles.push(leftBlock, rightBlock);
+  }
+
+  function onPointer(e){
+    const rect = cv.getBoundingClientRect();
+    const x = (e.touches? e.touches[0].clientX : e.clientX) - rect.left;
+    pointerX = x * (W / rect.width);
+  }
+  cv.addEventListener('pointerdown', e=>{ pointerX=null; onPointer(e); });
+  cv.addEventListener('pointermove', onPointer);
+  cv.addEventListener('pointerup', ()=> pointerX=null);
+  cv.addEventListener('touchstart', onPointer, {passive:true});
+  cv.addEventListener('touchmove', onPointer, {passive:true});
+  cv.addEventListener('touchend', ()=> pointerX=null);
+
+  function loop(t){
+    if(!running){ return; }
+    const dt = Math.min(0.033, (t - tLast)/1000);
+    tLast = t;
+    if (!paused) { update(dt); draw(); }
+    requestAnimationFrame(loop);
+  }
+
+  function update(dt){
+    speedBase += dt * 2.0;
+
+    if(pointerX !== null){
+      const k = 12;
+      player.vx += (pointerX - player.x)*k*dt;
+    }
+    player.x += player.vx*dt;
+    player.vx *= 0.92;
+    player.x = Math.max(player.r, Math.min(W - player.r, player.x));
+
+    spawnTimer -= dt;
+    if(spawnTimer <= 0){ spawn(); spawnTimer = Math.max(0.45, 0.95 - score*0.002); }
+    for(const o of obstacles){ o.y += (o.vy + score*0.1)*dt; }
+    obstacles = obstacles.filter(o => o.y < H+30);
+
+    for(const o of obstacles){
+      const cx = Math.max(o.x, Math.min(player.x, o.x+o.w));
+      const cy = Math.max(o.y, Math.min(player.y, o.y+o.h));
+      const dx = player.x - cx, dy = player.y - cy;
+      if (dx*dx + dy*dy < player.r*player.r){ gameOver(); return; }
+    }
+
+    score += dt*10;
+    scEl.textContent = Math.floor(score);
+  }
+
+  function draw(){
+    ct.fillStyle = '#0c0f13';
+    ct.fillRect(0,0,W,H);
+
+    ct.strokeStyle = 'rgba(255,255,255,.06)';
+    for(let y=0;y<H;y+=40){
+      ct.beginPath();
+      ct.moveTo(0, (y + (performance.now()/20)%40));
+      ct.lineTo(W, (y + (performance.now()/20)%40));
+      ct.stroke();
+    }
+
+    ct.fillStyle = '#22d3ee';
+    obstacles.forEach(o => ct.fillRect(o.x, o.y, o.w, o.h));
+
+    const g = ct.createRadialGradient(player.x, player.y, 2, player.x, player.y, player.r+2);
+    g.addColorStop(0, '#fff'); g.addColorStop(1, '#60a5fa');
+    ct.fillStyle = g; ct.beginPath(); ct.arc(player.x, player.y, player.r, 0, Math.PI*2); ct.fill();
+  }
+
+  function gameOver(){
+    running = false;
+    const s = Math.floor(score);
+    if (s > best){ best = s; localStorage.setItem('vd_best', best); bestEl.textContent = best; }
+    startOverlay.style.display = 'flex';
+    startOverlay.querySelector('.card').innerHTML = `
+      <h2 style="margin:0 0 6px">GAME OVER</h2>
+      <p style="margin:0 0 8px">Score: <b>${s}</b> ／ Best: <b>${best}</b></p>
+      <button id="againBtn">↻ もう一度</button>
+    `;
+    document.getElementById('againBtn').onclick = () => { startOverlay.style.display='none'; start(); };
+  }
+
+  function start(){
+    reset();
+    startOverlay.style.display = 'none';
+    running = true; paused = false; pauseBtn.textContent = '⏸︎';
+    requestAnimationFrame(loop);
+  }
+
+  // ボタン
+  startBtn.onclick = start;
+  restartBtn.onclick = () => start();
+  pauseBtn.onclick = () => {
+    if(!running) return;
+    paused = !paused;
+    pauseBtn.textContent = paused ? '▶' : '⏸︎';
+  };
+})();
+</script>
+</body>
+</html>
