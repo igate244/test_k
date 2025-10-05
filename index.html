@@ -1,495 +1,331 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-  <title>いろは・ゆうり・なぎさ・つよし・りさ — すいかゲーム風</title>
-  <style>
-    :root {
-      --bg: #0b132b;
-      --panel: #1c2541;
-      --accent: #5bc0be;
-      --text: #f2f7ff;
-      --warn: #ff8c8c;
-    }
-    html, body {
-      margin: 0;
-      height: 100%;
-      background: var(--bg);
-      color: var(--text);
-      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic", "Meiryo", sans-serif;
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-      touch-action: none; /* for better mobile control */
-    }
-    .wrap {
-      display: grid;
-      grid-template-rows: auto 1fr auto;
-      place-items: center;
-      gap: 8px;
-      padding: 8px;
-      height: 100%;
-      box-sizing: border-box;
-    }
-    .topbar {
-      width: min(440px, 92vw);
-      background: linear-gradient(180deg, #222b4d, var(--panel));
-      border: 1px solid #2e3a63;
-      border-radius: 14px;
-      padding: 8px 12px;
-      display: grid;
-      grid-template-columns: 1fr auto auto auto;
-      align-items: center;
-      gap: 10px;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.2);
-    }
-    .brand {
-      font-weight: 700;
-      letter-spacing: .03em;
-    }
-    .score {
-      font-variant-numeric: tabular-nums;
-      padding: 4px 8px;
-      border-radius: 8px;
-      background: #121a34;
-      border: 1px solid #2a3560;
-    }
-    .nextbox {
-      display: grid;
-      grid-template-columns: auto auto;
-      gap: 8px;
-      align-items: center;
-    }
-    .nextbox small { opacity: .8; }
-    #nextCanvas {
-      width: 40px; height: 40px;
-      background: #0f1630;
-      border: 1px solid #2a3560; border-radius: 8px;
-    }
-    button, .btn {
-      appearance: none; color: var(--text);
-      background: var(--accent);
-      border: none; border-radius: 10px;
-      padding: 8px 12px; font-weight: 700; cursor: pointer;
-      box-shadow: 0 6px 18px rgba(91,192,190,.35);
-    }
-    button:active { transform: translateY(1px); }
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+<title>Vertical Dodge (3 Characters)</title>
+<style>
+  :root { color-scheme: light dark; }
+  html,body { margin:0; height:100%; font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue"; }
+  #wrap { position:fixed; inset:0; background:#111; display:flex; align-items:center; justify-content:center; }
+  canvas { width:100vw; height:100vh; touch-action:none; }
 
-    #stageWrap { position: relative; }
-    #stage {
-      display: block;
-      width: min(440px, 92vw);
-      height: calc(min(440px, 92vw) * 1.5);
-      max-height: 88vh;
-      background: radial-gradient(1200px 400px at 50% -200px, #20305e, #0b132b 60%);
-      border: 1px solid #2a3560;
-      border-radius: 16px;
-      box-shadow: inset 0 4px 24px rgba(0,0,0,.35), 0 12px 28px rgba(0,0,0,.35);
-    }
-    .hud {
-      position: absolute; inset: 0; pointer-events: none;
-      border-radius: 16px;
-    }
-    .line {
-      position: absolute; left: 8px; right: 8px; height: 0;
-      border-top: 2px dashed rgba(255,255,255,.25);
-    }
-    .line.top { top: 64px; }
-    .line.lose { top: 104px; border-top-color: var(--warn); }
-    .ghost {
-      position: absolute; width: 0; height: 0; left: 0; top: 0; pointer-events: none;
-    }
-    .goPanel {
-      position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none;
-      background: linear-gradient(180deg, rgba(11,19,43,0), rgba(11,19,43,.55));
-      opacity: 0; transition: opacity .25s ease;
-    }
-    .goPanel.show { opacity: 1; }
-    .goCard {
-      pointer-events: auto;
-      padding: 16px 18px; border-radius: 16px; text-align: center; width: min(360px, 90%);
-      backdrop-filter: blur(8px);
-      background: rgba(18,26,52,.92);
-      border: 1px solid #2a3560;
-      box-shadow: 0 14px 40px rgba(0,0,0,.5);
-    }
-    .footer { opacity: .7; font-size: 12px; }
-    a { color: #8fd6d4; }
-  </style>
+  .hud { position:fixed; left:12px; top:10px; color:#fff; font-weight:700; text-shadow:0 1px 3px #000; }
+  .btns { position:fixed; right:12px; top:10px; display:flex; gap:8px; }
+  button { border:none; border-radius:12px; padding:8px 12px; font-weight:600; cursor:pointer; }
+
+  .overlay {
+    position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    color:#fff; background:rgba(0,0,0,.55); text-align:center; gap:14px; padding:20px;
+  }
+  .card { background:rgba(255,255,255,.1); padding:18px 20px; border-radius:20px; backdrop-filter: blur(4px); max-width:520px; width:calc(100% - 40px);}
+  .subtitle { opacity:.9; margin:0 0 10px; }
+  input[type=password]{ padding:10px 12px; border-radius:10px; border:none; min-width:220px; }
+  .hint{ opacity:.85; font-size:.9em; }
+
+  /* キャラ選択 */
+  .ch-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:8px; }
+  .ch-item{
+    background:rgba(255,255,255,.08); border:2px solid transparent; border-radius:16px; padding:10px;
+    display:flex; flex-direction:column; align-items:center; gap:8px;
+    transition:transform .08s ease, border-color .08s ease, background .08s ease;
+  }
+  .ch-item img{ width:84px; height:84px; image-rendering:pixelated; }
+  .ch-item span{ font-weight:700; }
+  .ch-item:hover{ transform:translateY(-2px); }
+  .ch-item.selected{ border-color:#22d3ee; background:rgba(34,211,238,.15); }
+
+  .row{ display:flex; gap:8px; justify-content:center; flex-wrap:wrap; }
+  .start-btn{ padding:10px 16px; border-radius:12px; font-weight:800; }
+  .start-btn[disabled]{ opacity:.5; cursor:not-allowed; }
+</style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="topbar">
-      <div class="brand">🍉 すいかゲーム風（いろは→ゆうり→なぎさ→つよし→りさ）</div>
-      <div class="nextbox"><small>NEXT</small><canvas id="nextCanvas" width="40" height="40"></canvas></div>
-      <div class="score">SCORE <span id="score">0</span></div>
-      <button id="restartBtn" title="R キーでも再開">リスタート</button>
-    </div>
+<div id="wrap">
+  <canvas id="cv" width="360" height="640"></canvas>
 
-    <div id="stageWrap">
-      <!-- Matter.js が描画するキャンバス -->
-      <canvas id="stage"></canvas>
-      <div class="hud">
-        <div class="line top" title="ここより上で積むと危険ゾーン"></div>
-        <div class="line lose" title="ここを超えるとゲームオーバー"></div>
-      </div>
-      <div class="goPanel" id="goPanel">
-        <div class="goCard">
-          <h2 style="margin:6px 0 10px">Game Over…</h2>
-          <p style="margin:0 0 12px">りさ×2で消えるよ。画面タップ / スペースで落下、左右に指/マウスで位置調整。</p>
-          <p style="margin:0 0 14px">スコア：<b id="finalScore">0</b></p>
-          <button id="againBtn">もう一度あそぶ</button>
-        </div>
-      </div>
-    </div>
+  <div class="hud">Score: <span id="sc">0</span> ｜ Best: <span id="best">0</span></div>
+  <div class="btns">
+    <button id="pauseBtn">⏸︎</button>
+    <button id="restartBtn">↻</button>
+  </div>
 
-    <div class="footer">
-      <p style="margin:0">
-        単一ファイルで動作／GitHub Pages 直置きOK。画像に差し替える場合は <code>assets/iroha.png, yuri.png, nagisa.png, tsuyoshi.png, risa.png</code> を置き、<code>USE_IMAGES = true</code> にしてください。
-      </p>
+  <!-- パスコード -->
+  <div id="gate" class="overlay">
+    <div class="card">
+      <h2 style="margin:0 0 8px">Passcode</h2>
+      <p class="hint subtitle">合言葉を入力してください</p>
+      <input id="pw" type="password" placeholder="passcode" />
+      <div class="row" style="margin-top:10px">
+        <button id="enterBtn">入室</button>
+      </div>
+      <p id="msg" class="hint" style="color:#ffd1d1;min-height:1.4em"></p>
     </div>
   </div>
 
-  <!-- Matter.js CDN -->
-  <script src="https://unpkg.com/matter-js@0.20.0/build/matter.min.js" defer>/**/})();
-  </script>
-  <script>
-    window.addEventListener('load', () => {
-      const USE_IMAGES = true; // 画像を使う場合は true に。assets/*.png を配置してください。
+  <!-- スタート＆キャラ選択 -->
+  <div id="overlay" class="overlay" style="display:none">
+    <div class="card">
+      <h1 style="margin:0 0 6px">Vertical Dodge</h1>
+      <p class="subtitle">キャラクターを選んでからゲーム開始してください</p>
 
-      // 画像ロード（任意）
-      const imageFiles = {
-        0: 'assets/iroha.png',
-        1: 'assets/yuri.png',
-        2: 'assets/nagisa.png',
-        3: 'assets/tsuyoshi.png',
-        4: 'assets/risa.png'
-      };
-      const images = {};
-      if (USE_IMAGES) {
-        Object.keys(imageFiles).forEach(k => {
-          const img = new Image();
-          img.src = imageFiles[k];
-          images[k] = img;
-        });
-      }
+      <div id="chGrid" class="ch-grid">
+        <button class="ch-item" data-ch="i" aria-label="井代">
+          <img src="assets/i.png" alt="井代" onerror="this.style.opacity=0.4">
+          <span>井代</span>
+        </button>
+        <button class="ch-item" data-ch="f" aria-label="福山">
+          <img src="assets/f.png" alt="福山" onerror="this.style.opacity=0.4">
+          <span>福山</span>
+        </button>
+        <button class="ch-item" data-ch="n" aria-label="野口">
+          <img src="assets/n.png" alt="野口" onerror="this.style.opacity=0.4">
+          <span>野口</span>
+        </button>
+      </div>
 
-      // ====== 基本設定 ======
-      const NAMES = ['いろは','ゆうり','なぎさ','つよし','りさ'];
-      const TIERS = [
-        { name: NAMES[0], r: 16, color: '#ffadad', score: 1 },
-        { name: NAMES[1], r: 22, color: '#ffd6a5', score: 3 },
-        { name: NAMES[2], r: 30, color: '#fdffb6', score: 6 },
-        { name: NAMES[3], r: 40, color: '#caffbf', score: 12 },
-        { name: NAMES[4], r: 54, color: '#a0c4ff', score: 25 }, // りさ
-      ];
-      const BONUS_CLEAR = 100; // りさ×2で消えたとき
+      <div class="row" style="margin-top:14px">
+        <button id="startBtn" class="start-btn" disabled>▶ ゲーム開始</button>
+      </div>
+      <p class="hint" style="margin-top:6px">※ キャラは端末ごとに記憶されます（セッション中）</p>
+    </div>
+  </div>
+</div>
 
-      const stage = document.getElementById('stage');
-      const nextCanvas = document.getElementById('nextCanvas');
-      const nextCtx = nextCanvas.getContext('2d');
-      const scoreEl = document.getElementById('score');
-      const restartBtn = document.getElementById('restartBtn');
-      const goPanel = document.getElementById('goPanel');
-      const againBtn = document.getElementById('againBtn');
-      const finalScoreEl = document.getElementById('finalScore');
+<script>
+(() => {
+  // ========= パスコード =========
+  const PASSCODE = 'AK';
+  const gate = document.getElementById('gate');
+  const enterBtn = document.getElementById('enterBtn');
+  const pw = document.getElementById('pw');
+  const msg = document.getElementById('msg');
+  const startOverlay = document.getElementById('overlay');
 
-      // 固定サイズ（ゲームバランス調整済）
-      const WIDTH = Math.min(440, Math.floor(window.innerWidth * 0.92));
-      const HEIGHT = Math.min(720, Math.floor(WIDTH * 1.5));
-      stage.width = WIDTH; stage.height = HEIGHT;
+  if (sessionStorage.getItem('pass_ok') === '1') {
+    gate.style.display = 'none';
+    startOverlay.style.display = 'flex';
+  }
 
-      // ガイドライン
-      const SPAWN_Y = 160; // 出現ライン（負けラインより十分下に）
-      const LOSE_Y = 104; // ゲームオーバーライン（この高さより上に積まれるとOUT）
+  enterBtn.onclick = () => {
+    if (pw.value.trim() === PASSCODE) {
+      sessionStorage.setItem('pass_ok','1');
+      gate.style.display = 'none';
+      startOverlay.style.display = 'flex';
+    } else {
+      msg.textContent = '合言葉が違います';
+      pw.focus();
+    }
+  };
+  pw.addEventListener('keydown', e => { if(e.key==='Enter') enterBtn.click(); });
 
-      // Matter.js ショートハンド
-      const { Engine, Render, Runner, World, Bodies, Body, Events, Composite } = Matter;
+  // ========= 画像読み込み & キャラ選択 =========
+  const imgMap = {
+    i: new Image(), // 井代
+    f: new Image(), // 福山
+    n: new Image(), // 野口
+  };
+  imgMap.i.src = 'assets/i.png';
+  imgMap.f.src = 'assets/f.png';
+  imgMap.n.src = 'assets/n.png';
 
-      const engine = Engine.create();
-      engine.gravity.y = 1.05; // ほんの少し軽め
-      const render = Render.create({
-        canvas: stage,
-        engine,
-        options: {
-          width: WIDTH,
-          height: HEIGHT,
-          wireframes: false,
-          background: 'transparent'
-        }
-      });
-      Render.run(render);
-      const runner = Runner.create();
-      Runner.run(runner, engine);
+  let selectedCh = sessionStorage.getItem('ch') || null;
+  let currentImg = null;
 
-      // 境界（壁と床）
-      const wallT = 40;
-      const walls = [
-        Bodies.rectangle(WIDTH/2, HEIGHT + wallT/2 - 8, WIDTH-16, wallT, { isStatic: true, render:{ fillStyle: '#132048' } }), // floor (少し高摩擦)
-        Bodies.rectangle(-wallT/2 + 8, HEIGHT/2, wallT, HEIGHT-16, { isStatic: true, render:{ fillStyle: '#162350' } }), // left
-        Bodies.rectangle(WIDTH + wallT/2 - 8, HEIGHT/2, wallT, HEIGHT-16, { isStatic: true, render:{ fillStyle: '#162350' } }), // right
-        Bodies.rectangle(WIDTH/2, -wallT/2, WIDTH, wallT, { isStatic: true, render:{ fillStyle: 'transparent' } }), // ceiling guard
-      ];
-      World.add(engine.world, walls);
+  const chGrid = document.getElementById('chGrid');
+  const startBtn = document.getElementById('startBtn');
 
-      // ステート
-      let currentX = WIDTH/2;
-      let currentTier = rollTier();
-      let nextTier = rollTier();
-      let score = 0;
-      let gameOver = false;
-      let dropCooldown = false; // 連打防止
-
-      drawNextPreview(nextTier);
-
-      // 入力
-      const clamp = (v, min, max) => Math.min(Math.max(v, min), max);
-      function setXFromClient(clientX) {
-        const rect = stage.getBoundingClientRect();
-        const x = ((clientX - rect.left) / rect.width) * WIDTH;
-        currentX = clamp(x, 24, WIDTH-24);
-      }
-      stage.addEventListener('pointermove', (e) => setXFromClient(e.clientX));
-      stage.addEventListener('pointerdown', (e) => {
-        setXFromClient(e.clientX);
-        tryDrop();
-      });
-      window.addEventListener('keydown', (e) => {
-        if (e.code === 'ArrowLeft') { currentX = clamp(currentX - 18, 24, WIDTH-24); }
-        if (e.code === 'ArrowRight'){ currentX = clamp(currentX + 18, 24, WIDTH-24); }
-        if (e.code === 'Space' || e.code === 'Enter') { tryDrop(); }
-        if (e.key === 'r' || e.key === 'R') restart();
-      }, { passive: false });
-      restartBtn.addEventListener('click', restart);
-      againBtn.addEventListener('click', restart);
-
-      function tryDrop(){
-        if (gameOver || dropCooldown) return;
-        dropCooldown = true; setTimeout(() => dropCooldown = false, 120);
-        dropPiece(currentTier, currentX, SPAWN_Y);
-        currentTier = nextTier;
-        nextTier = rollTier();
-        drawNextPreview(nextTier);
-      }
-
-      // ランダム生成（序盤は小さめが出やすい）
-      function rollTier(){
-        const bag = [0,0,0,1,1,2];
-        return bag[Math.floor(Math.random()*bag.length)];
-      }
-
-      // ピース生成
-      function createPiece(tier, x, y){
-        const t = TIERS[tier];
-        const body = Bodies.circle(x, y, t.r, {
-          restitution: 0.05,
-          friction: 0.12,
-          frictionAir: 0.0025,
-          density: 0.0018 * (1 + tier*0.22),
-          render: { fillStyle: t.color, strokeStyle: '#2a2a2a', lineWidth: 1 }
-        });
-        body.plugin = { tier, removed: false, bornAt: performance.now() };
-        return body;
-      }
-      function dropPiece(tier, x, y){
-        const body = createPiece(tier, x, y);
-        World.add(engine.world, body);
-      }
-
-      // スコア
-      function addScore(v){
-        score += v; scoreEl.textContent = score;
-      }
-
-      // マージ制御
-      const mergeKeys = new Set();
-      Events.on(engine, 'collisionStart', (e) => {
-        for (const p of e.pairs){
-          const a = p.bodyA, b = p.bodyB;
-          if (!a.plugin || !b.plugin) continue;
-          if (a.plugin.removed || b.plugin.removed) continue;
-          if (a.plugin.tier === undefined || b.plugin.tier === undefined) continue;
-          if (a.plugin.tier !== b.plugin.tier) continue;
-          // 壁など静的とは合体させない
-          if (a.isStatic || b.isStatic) continue;
-          // 生直後は誤爆防止
-          const now = performance.now();
-          if (now - a.plugin.bornAt < 80 || now - b.plugin.bornAt < 80) continue;
-
-          const key = [a.id, b.id].sort().join('-');
-          if (mergeKeys.has(key)) continue;
-          mergeKeys.add(key);
-          queueMerge(a, b);
-        }
-      });
-
-      function queueMerge(a, b){
-        // 次フレームで実行（安定化）
-        setTimeout(() => doMerge(a, b), 0);
-      }
-      function doMerge(a, b){
-        try {
-          if (!Composite.get(engine.world, a.id, 'body') || !Composite.get(engine.world, b.id, 'body')) return;
-          if (a.plugin.removed || b.plugin.removed) return;
-          const tier = a.plugin.tier;
-          const nx = (a.position.x + b.position.x)/2;
-          const ny = (a.position.y + b.position.y)/2;
-
-          // 消去
-          a.plugin.removed = b.plugin.removed = true;
-          World.remove(engine.world, a);
-          World.remove(engine.world, b);
-
-          if (tier < TIERS.length - 1) {
-            // 次ランクに昇格
-            const next = createPiece(tier + 1, nx, ny);
-            World.add(engine.world, next);
-            addScore(TIERS[tier + 1].score);
-          } else {
-            // りさ同士は消滅 → ボーナス
-            addScore(BONUS_CLEAR);
-            // ちょっとだけ打ち上げ花火的な演出（簡易）
-            burst(nx, ny, 10);
-          }
-          // 早めにゲームオーバー判定
-          checkGameOver();
-        } finally {
-          // クリーンアップ
-          mergeKeys.clear();
-        }
-      }
-
-      function burst(x, y, n){
-        for (let i=0;i<n;i++){
-          const r = 2 + Math.random()*3;
-          const p = Bodies.circle(x, y, r, {
-            restitution: 0.6,
-            friction: 0.02,
-            density: 0.0008,
-            render: { fillStyle: ['#fff','#8fd6d4','#ffd6a5','#caffbf'][i%4] }
-          });
-          Body.setVelocity(p, { x: (Math.random()-0.5)*6, y: -Math.random()*6 - 2 });
-          World.add(engine.world, p);
-          // 自動消滅
-          setTimeout(() => { try { World.remove(engine.world, p); } catch{} }, 1500 + Math.random()*500);
-        }
-      }
-
-      // 毎フレーム：ガイドやテキスト描画、敗北チェック
-      Events.on(render, 'afterRender', () => {
-        const ctx = render.context;
-
-        // ピースのラベル or 画像
-        const bodies = Composite.allBodies(engine.world);
-        for (const body of bodies){
-          if (!body.plugin || body.plugin.tier === undefined) continue;
-          const t = TIERS[body.plugin.tier];
-          const { x, y } = body.position;
-          ctx.save();
-          ctx.translate(x, y);
-          ctx.rotate(body.angle);
-
-          if (USE_IMAGES && images[body.plugin.tier] && images[body.plugin.tier].complete) {
-            // 円形にクリップして画像を描く
-            ctx.beginPath();
-            ctx.arc(0, 0, t.r, 0, Math.PI*2);
-            ctx.closePath();
-            ctx.clip();
-            const img = images[body.plugin.tier];
-            const s = t.r * 2;
-            ctx.drawImage(img, -s/2, -s/2, s, s);
-          } else {
-            // テキストラベル
-            ctx.fillStyle = '#1a1a1a';
-            ctx.font = `bold ${Math.max(12, Math.floor(t.r*0.9))}px system-ui, sans-serif`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(t.name, 0, 1);
-          }
-          ctx.restore();
-        }
-
-        // ゴースト（現在位置）
-        if (!gameOver) {
-          const t = TIERS[currentTier];
-          ctx.save();
-          ctx.setLineDash([6, 6]);
-          ctx.strokeStyle = 'rgba(255,255,255,.6)';
-          ctx.lineWidth = 2;
-          ctx.beginPath(); ctx.arc(currentX, SPAWN_Y, t.r, 0, Math.PI*2); ctx.stroke();
-          ctx.restore();
-        }
-      });
-
-      // 敗北チェック（一定間隔で軽く）
-      let frame = 0;
-      Events.on(engine, 'afterUpdate', () => {
-        frame++;
-        if (frame % 6 !== 0) return;
-        checkGameOver();
-      });
-
-      function checkGameOver(){
-        if (gameOver) return;
-        const now = performance.now();
-        const bodies = Composite.allBodies(engine.world);
-        let minTop = Infinity;
-        for (const body of bodies){
-          if (!body.plugin || body.plugin.tier === undefined) continue;
-          // 直後のピースや落下中は除外（誤判定防止）
-          const age = now - (body.plugin.bornAt || 0);
-          const settled = body.speed < 0.12; // ほぼ静止
-          if (age < 900 || !settled) continue;
-          const r = TIERS[body.plugin.tier].r;
-          const top = body.position.y - r;
-          if (top < minTop) minTop = top;
-        }
-        if (minTop < LOSE_Y){
-          gameOver = true;
-          finalScoreEl.textContent = score;
-          goPanel.classList.add('show');
-        }
-      }
-        if (minTop < LOSE_Y){
-          gameOver = true;
-          finalScoreEl.textContent = score;
-          goPanel.classList.add('show');
-        }
-      }
-
-      function restart(){
-        // ワールド初期化
-        const all = Composite.allBodies(engine.world);
-        for (const b of all){
-          if (!walls.includes(b)) try { World.remove(engine.world, b); } catch{}
-        }
-        score = 0; scoreEl.textContent = '0';
-        currentTier = rollTier();
-        nextTier = rollTier();
-        drawNextPreview(nextTier);
-        gameOver = false;
-        goPanel.classList.remove('show');
-      }
-
-      function drawNextPreview(tier){
-        const t = TIERS[tier];
-        nextCtx.clearRect(0,0,40,40);
-        nextCtx.save();
-        nextCtx.translate(20,20);
-        nextCtx.beginPath();
-        nextCtx.arc(0,0,14,0,Math.PI*2);
-        nextCtx.fillStyle = t.color; nextCtx.fill();
-        nextCtx.strokeStyle = '#2a2a2a'; nextCtx.lineWidth = 1; nextCtx.stroke();
-        nextCtx.fillStyle = '#1a1a1a';
-        nextCtx.font = 'bold 10px system-ui, sans-serif';
-        nextCtx.textAlign = 'center'; nextCtx.textBaseline = 'middle';
-        nextCtx.fillText(t.name, 0, 0);
-        nextCtx.restore();
-      }
-
-      // 初期ヒント：中心にカーソル
-      currentX = WIDTH/2;
+  function updateSelectionUI() {
+    [...chGrid.querySelectorAll('.ch-item')].forEach(btn=>{
+      btn.classList.toggle('selected', btn.dataset.ch === selectedCh);
     });
-  </script>
+    startBtn.disabled = !selectedCh;
+  }
+
+  chGrid.addEventListener('click', (e)=>{
+    const btn = e.target.closest('.ch-item');
+    if (!btn) return;
+    selectedCh = btn.dataset.ch;
+    sessionStorage.setItem('ch', selectedCh);
+    currentImg = imgMap[selectedCh] || imgMap.i;
+    updateSelectionUI();
+  });
+
+  // URLクエリでも選択可（?ch=i/f/n）
+  const qp = new URLSearchParams(location.search);
+  if (!selectedCh && qp.get('ch')) {
+    const q = qp.get('ch').toLowerCase();
+    if (imgMap[q]) { selectedCh = q; sessionStorage.setItem('ch', q); }
+  }
+  currentImg = imgMap[selectedCh] || imgMap.i;
+  updateSelectionUI();
+
+  // ========= ゲーム本体 =========
+  const cv = document.getElementById('cv');
+  const ct = cv.getContext('2d');
+  const scEl = document.getElementById('sc');
+  const bestEl = document.getElementById('best');
+  const pauseBtn = document.getElementById('pauseBtn');
+  const restartBtn = document.getElementById('restartBtn');
+
+  function fit() {
+    const ratio = 360/640;
+    const w = window.innerWidth, h = window.innerHeight;
+    let cw = w, ch = Math.round(w/ratio);
+    if (ch > h) { ch = h; cw = Math.round(h*ratio); }
+    cv.style.width = cw + 'px';
+    cv.style.height = ch + 'px';
+  }
+  window.addEventListener('resize', fit); fit();
+
+  const W = 360, H = 640;
+  let player, obstacles, score, best = +localStorage.getItem('vd_best') || 0;
+  bestEl.textContent = best;
+  let tLast = 0, running = false, paused = false, speedBase = 120;
+  let spawnTimer = 0;
+  let pointerX = null;
+
+  function reset() {
+    player = { x: W/2, y: H-90, r: 18, vx: 0 }; // 少し大きめに
+    obstacles = [];
+    score = 0; scEl.textContent = 0;
+    tLast = performance.now();
+    spawnTimer = 0;
+    speedBase = 120;
+  }
+
+  function spawn() {
+    const w = 40 + Math.random()*80;
+    const gap = 80 + Math.random()*80;
+    const leftBlock = {x:0, y:-20, w:Math.random()<0.5? (W-gap-w):w, h:12, vy: speedBase};
+    const rightBlock = {x:leftBlock.w+gap, y:-20, w: W-(leftBlock.w+gap), h:12, vy: speedBase};
+    obstacles.push(leftBlock, rightBlock);
+  }
+
+  function onPointer(e){
+    const rect = cv.getBoundingClientRect();
+    const x = (e.touches? e.touches[0].clientX : e.clientX) - rect.left;
+    pointerX = x * (W / rect.width);
+  }
+  cv.addEventListener('pointerdown', e=>{ pointerX=null; onPointer(e); });
+  cv.addEventListener('pointermove', onPointer);
+  cv.addEventListener('pointerup', ()=> pointerX=null);
+  cv.addEventListener('touchstart', onPointer, {passive:true});
+  cv.addEventListener('touchmove', onPointer, {passive:true});
+  cv.addEventListener('touchend', ()=> pointerX=null);
+
+  function loop(t){
+    if(!running){ return; }
+    const dt = Math.min(0.033, (t - tLast)/1000);
+    tLast = t;
+    if (!paused) { update(dt); draw(); }
+    requestAnimationFrame(loop);
+  }
+
+  function update(dt){
+    speedBase += dt * 2.0;
+
+    if(pointerX !== null){
+      const k = 12;
+      player.vx += (pointerX - player.x)*k*dt;
+    }
+    player.x += player.vx*dt;
+    player.vx *= 0.92;
+    player.x = Math.max(player.r, Math.min(W - player.r, player.x));
+
+    spawnTimer -= dt;
+    if(spawnTimer <= 0){ spawn(); spawnTimer = Math.max(0.45, 0.95 - score*0.002); }
+    for(const o of obstacles){ o.y += (o.vy + score*0.1)*dt; }
+    obstacles = obstacles.filter(o => o.y < H+30);
+
+    for(const o of obstacles){
+      const cx = Math.max(o.x, Math.min(player.x, o.x+o.w));
+      const cy = Math.max(o.y, Math.min(player.y, o.y+o.h));
+      const dx = player.x - cx, dy = player.y - cy;
+      if (dx*dx + dy*dy < player.r*player.r){ gameOver(); return; }
+    }
+
+    score += dt*10;
+    scEl.textContent = Math.floor(score);
+  }
+
+  function draw(){
+    // 背景
+    ct.fillStyle = '#0c0f13';
+    ct.fillRect(0,0,W,H);
+    // 流れ線
+    ct.strokeStyle = 'rgba(255,255,255,.06)';
+    for(let y=0;y<H;y+=40){
+      ct.beginPath();
+      ct.moveTo(0, (y + (performance.now()/20)%40));
+      ct.lineTo(W, (y + (performance.now()/20)%40));
+      ct.stroke();
+    }
+    // 障害物
+    ct.fillStyle = '#22d3ee';
+    obstacles.forEach(o => ct.fillRect(o.x, o.y, o.w, o.h));
+
+    // プレイヤー（画像）
+    const size = player.r * 2;
+    const x = player.x - size/2;
+    const y = player.y - size/2;
+    const img = currentImg && currentImg.complete ? currentImg : null;
+    if (img) {
+      ct.drawImage(img, x, y, size, size);
+    } else {
+      // フォールバック
+      ct.fillStyle = '#60a5fa';
+      ct.beginPath(); ct.arc(player.x, player.y, player.r, 0, Math.PI*2); ct.fill();
+    }
+  }
+
+  function gameOver(){
+    running = false;
+    const s = Math.floor(score);
+    if (s > best){ best = s; localStorage.setItem('vd_best', best); bestEl.textContent = best; }
+    startOverlay.style.display = 'flex';
+    // スコア表示と再挑戦
+    startOverlay.querySelector('.card').innerHTML = `
+      <h2 style="margin:0 0 6px">GAME OVER</h2>
+      <p style="margin:0 0 8px">Score: <b>${s}</b> ／ Best: <b>${best}</b></p>
+      <div class="row" style="margin-bottom:8px">
+        <button id="againBtn">↻ もう一度</button>
+      </div>
+      <p class="hint">※ キャラを変える場合は、下のボタンから選び直してください</p>
+      <div id="chGrid2" class="ch-grid" style="margin-top:8px">
+        <button class="ch-item" data-ch="i"><img src="assets/i.png" alt="井代"><span>井代</span></button>
+        <button class="ch-item" data-ch="f"><img src="assets/f.png" alt="福山"><span>福山</span></button>
+        <button class="ch-item" data-ch="n"><img src="assets/n.png" alt="野口"><span>野口</span></button>
+      </div>
+    `;
+    document.getElementById('againBtn').onclick = () => { startOverlay.style.display='none'; start(); };
+    // ゲームオーバー画面でも選択できるように
+    startOverlay.querySelector('#chGrid2').addEventListener('click', (e)=>{
+      const btn = e.target.closest('.ch-item'); if(!btn) return;
+      selectedCh = btn.dataset.ch;
+      sessionStorage.setItem('ch', selectedCh);
+      currentImg = imgMap[selectedCh] || imgMap.i;
+    });
+  }
+
+  function start(){
+    if (!selectedCh) return; // 念のため
+    currentImg = imgMap[selectedCh] || imgMap.i;
+    reset();
+    startOverlay.style.display = 'none';
+    running = true; paused = false; pauseBtn.textContent = '⏸︎';
+    requestAnimationFrame(loop);
+  }
+
+  // ボタン
+  startBtn.onclick = start;
+  restartBtn.onclick = () => start();
+  pauseBtn.onclick = () => {
+    if(!running) return;
+    paused = !paused;
+    pauseBtn.textContent = paused ? '▶' : '⏸︎';
+  };
+})();
+</script>
 </body>
 </html>
