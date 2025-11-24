@@ -1,0 +1,59 @@
+// ▼ Firebase設定（ここを自分の設定で書き換える！）
+const firebaseConfig = {
+  // Firebaseコンソールで表示された設定を丸ごと貼り付け
+};
+
+// ▼ Firebase SDK 読み込み（CDN）
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  getDocs,
+  query,
+  orderBy
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+// ▼ Firebase初期化
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// ▼ フォーム & リスト
+const form = document.getElementById("quote-form");
+const listEl = document.getElementById("quotes-list");
+
+// ▼ セーブ処理
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  const title = document.getElementById("title").value;
+  const character = document.getElementById("character").value;
+  const text = document.getElementById("text").value;
+
+  await addDoc(collection(db, "quotes"), {
+    title,
+    character,
+    text,
+    createdAt: new Date()
+  });
+
+  form.reset();
+  loadQuotes();
+});
+
+// ▼ 一覧表示
+async function loadQuotes() {
+  listEl.innerHTML = "";
+
+  const q = query(collection(db, "quotes"), orderBy("createdAt", "desc"));
+  const snapshot = await getDocs(q);
+
+  snapshot.forEach((doc) => {
+    const data = doc.data();
+    const li = document.createElement("li");
+    li.textContent = `【${data.title}】${data.character}：「${data.text}」`;
+    listEl.appendChild(li);
+  });
+}
+
+loadQuotes();
