@@ -1,6 +1,12 @@
 // ▼ Firebase設定（ここを自分の設定で書き換える！）
 const firebaseConfig = {
-  // Firebaseコンソールで表示された設定を丸ごと貼り付け
+  apiKey: "AIzaSyCuAr6OulPDjQXV-Ylm5JYysT7uOHymOac",
+  authDomain: "webword-2d1b2.firebaseapp.com",
+  projectId: "webword-2d1b2",
+  storageBucket: "webword-2d1b2.firebasestorage.app",
+  messagingSenderId: "579573439202",
+  appId: "1:579573439202:web:1c02ae30be842a68e7dcbb",
+  measurementId: "G-SS2ZR9BY67"
 };
 
 // ▼ Firebase SDK 読み込み（CDN）
